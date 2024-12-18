@@ -1,0 +1,6 @@
+*.*
+!src/inputs/*
+!src/days/*.c
+!src/days/*.h
+!src/*.c
+!src/*.h
