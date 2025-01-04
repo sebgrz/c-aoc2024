@@ -55,6 +55,7 @@ char *readSource(FILE *fPtr);
 void addToken(Token **tokens, Token token);
 Token *lexer(char **source);
 Node *parser(Token **tokens, char *source);
+int interpreter(Node *nodes);
 
 extern FILE *load()
 {
@@ -70,24 +71,45 @@ extern void part1(FILE *filePtr, char *result)
     source = readSource(filePtr);
     tokens = lexer(&source);
 
-    printf("\nREAD TOKENS - %ld\n", arrlen(tokens));
-    for (int i = 0; i < arrlen(tokens); i++)
-    {
-        Token t = tokens[i];
-        printf("token { .type %d, .start %d, length %d } \n", t.type, t.start, t.length);
-    }
+    // printf("\nREAD TOKENS - %ld\n", arrlen(tokens));
+    // for (int i = 0; i < arrlen(tokens); i++)
+    //{
+    //     Token t = tokens[i];
+    //     printf("token { .type %d, .start %d, length %d } \n", t.type, t.start, t.length);
+    // }
 
     Node *nodes = parser(&tokens, source);
-    printf("\nREAD NODES - %ld\n", arrlen(nodes));
-    for (int i = 0; i < arrlen(nodes); i++)
-    {
-        Node t = nodes[i];
-        printf("node { .type %d, .a1 %d, a2 %d } \n", t.type, t.n1->value, t.n2->value);
-    }
+    // printf("\nREAD NODES - %ld\n", arrlen(nodes));
+    // for (int i = 0; i < arrlen(nodes); i++)
+    //{
+    //     Node t = nodes[i];
+    //     printf("node { .type %d, .a1 %d, a2 %d } \n", t.type, t.n1->value, t.n2->value);
+    // }
+    sum = interpreter(nodes);
     free(source);
     arrfree(tokens);
 
     sprintf(result, "%d", sum);
+}
+
+int interpreter(Node *nodes)
+{
+    int sum = 0;
+
+    for (int i = 0; i < arrlen(nodes); i++)
+    {
+        Node *node = &nodes[i];
+        switch (node->type)
+        {
+        case N_MulFunction:
+            sum += node->n1->value * node->n2->value;
+            break;
+        default:
+            break;
+        }
+    }
+
+    return sum;
 }
 
 int tokenIndex = 0;
