@@ -59,7 +59,7 @@ int interpreter(Node *nodes);
 
 extern FILE *load()
 {
-    return fopen("inputs/day_3_sample.txt", "r");
+    return fopen("inputs/day_3.txt", "r");
 }
 
 extern void part1(FILE *filePtr, char *result)
@@ -70,24 +70,11 @@ extern void part1(FILE *filePtr, char *result)
 
     source = readSource(filePtr);
     tokens = lexer(&source);
-
-    // printf("\nREAD TOKENS - %ld\n", arrlen(tokens));
-    // for (int i = 0; i < arrlen(tokens); i++)
-    //{
-    //     Token t = tokens[i];
-    //     printf("token { .type %d, .start %d, length %d } \n", t.type, t.start, t.length);
-    // }
-
     Node *nodes = parser(&tokens, source);
-    // printf("\nREAD NODES - %ld\n", arrlen(nodes));
-    // for (int i = 0; i < arrlen(nodes); i++)
-    //{
-    //     Node t = nodes[i];
-    //     printf("node { .type %d, .a1 %d, a2 %d } \n", t.type, t.n1->value, t.n2->value);
-    // }
     sum = interpreter(nodes);
     free(source);
     arrfree(tokens);
+    arrfree(nodes);
 
     sprintf(result, "%d", sum);
 }
