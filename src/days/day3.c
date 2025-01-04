@@ -2,7 +2,7 @@
 
 extern FILE *load()
 {
-    return fopen("inputs/day_3.txt", "r");
+    return fopen("inputs/day_3_sample.txt", "r");
 }
 
 extern void part1(FILE *filePtr, char *result)
@@ -12,7 +12,7 @@ extern void part1(FILE *filePtr, char *result)
     int sum = 0;
 
     source = readSource(filePtr);
-    tokens = lexer(&source);
+    tokens = lexer(&source, false);
     Node *nodes = parser(&tokens, source);
     sum = interpreter(nodes);
     free(source);

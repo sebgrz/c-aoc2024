@@ -1,4 +1,5 @@
 #include "common.h"
+#include <stdbool.h>
 
 #define EXPECT_TOKEN(tokens, tokenType, tokenRef)                                                                      \
     {                                                                                                                  \
@@ -21,7 +22,9 @@ enum TokenType
     T_LeftParen,
     T_RightParen,
     T_Comma,
-    T_MulIns,
+    T_MulFun,
+    T_DoIns,
+    T_DontIns,
     T_Ins,
     T_Number,
     T_Char,
@@ -44,7 +47,7 @@ enum NodeType
 typedef struct Node
 {
     enum NodeType type;
-    struct Node *n1, *n2;
+    struct Node *blocks;
     union {
         int value;
     };
@@ -52,7 +55,7 @@ typedef struct Node
 
 char *readSource(FILE *fPtr);
 void addToken(Token **tokens, Token token);
-Token *lexer(char **source);
+Token *lexer(char **source, bool extended);
 Node *parser(Token **tokens, char *source);
 
 int interpreter(Node *nodes)
@@ -65,7 +68,11 @@ int interpreter(Node *nodes)
         switch (node->type)
         {
         case N_MulFunction:
-            sum += node->n1->value * node->n2->value;
+            int mul = 1;
+            for (int i = 0; i < arrlen(node->blocks); i++) {
+                mul *= node->blocks[i].value;
+            }
+            sum += mul;
             break;
         default:
             break;
@@ -109,7 +116,7 @@ Node *argNode(int value)
 Node *parseFunction(Token *tokens, char *source)
 {
     Token *tokenRef = NULL;
-    EXPECT_TOKEN(tokens, T_MulIns, &tokenRef)
+    EXPECT_TOKEN(tokens, T_MulFun, &tokenRef)
     EXPECT_TOKEN(tokens, T_LeftParen, &tokenRef)
 
     EXPECT_TOKEN(tokens, T_Number, &tokenRef)
@@ -132,8 +139,8 @@ Node *parseFunction(Token *tokens, char *source)
 
     Node *node = malloc(sizeof(Node));
     node->type = N_MulFunction;
-    node->n1 = argNode(a);
-    node->n2 = argNode(b);
+    arrput(node->blocks, *argNode(a));
+    arrput(node->blocks, *argNode(b));
     return node;
 }
 
@@ -159,7 +166,7 @@ Node *parser(Token **tokens, char *source)
     return nodes;
 }
 
-Token *lexer(char **source)
+Token *lexer(char **source, bool extended)
 {
     Token *tokens = NULL;
     int index = 0;
@@ -182,7 +189,7 @@ Token *lexer(char **source)
         if (ch >= 'a' && ch <= 'z')
         {
             token = (Token){
-                .type = T_MulIns,
+                .type = T_MulFun,
                 .start = index,
                 .length = 1,
             };
