@@ -39,6 +39,8 @@ typedef struct Token
 
 enum NodeType
 {
+    N_DontFunction,
+    N_DoFunction,
     N_MulFunction,
     N_ArgNumber,
     N_EOF,
@@ -61,6 +63,7 @@ Node *parser(Token **tokens, char *source);
 int interpreter(Node *nodes)
 {
     int sum = 0;
+    bool ignoreMul = false;
 
     for (int i = 0; i < arrlen(nodes); i++)
     {
@@ -68,11 +71,22 @@ int interpreter(Node *nodes)
         switch (node->type)
         {
         case N_MulFunction:
+            if (ignoreMul)
+            {
+                break;
+            }
             int mul = 1;
-            for (int i = 0; i < arrlen(node->blocks); i++) {
+            for (int i = 0; i < arrlen(node->blocks); i++)
+            {
                 mul *= node->blocks[i].value;
             }
             sum += mul;
+            break;
+        case N_DontFunction:
+            ignoreMul = true;
+            break;
+        case N_DoFunction:
+            ignoreMul = false;
             break;
         default:
             break;
@@ -113,10 +127,21 @@ Node *argNode(int value)
     return node;
 }
 
+Node *parseStatement(Token *tokens, char *source, enum NodeType type)
+{
+    Token *tokenRef = NULL;
+
+    EXPECT_TOKEN(tokens, T_LeftParen, &tokenRef)
+    EXPECT_TOKEN(tokens, T_RightParen, &tokenRef)
+
+    Node *node = malloc(sizeof(Node));
+    node->type = type;
+    return node;
+}
+
 Node *parseFunction(Token *tokens, char *source)
 {
     Token *tokenRef = NULL;
-    EXPECT_TOKEN(tokens, T_MulFun, &tokenRef)
     EXPECT_TOKEN(tokens, T_LeftParen, &tokenRef)
 
     EXPECT_TOKEN(tokens, T_Number, &tokenRef)
@@ -149,20 +174,50 @@ Node *parser(Token **tokens, char *source)
     Node *nodes = NULL;
     for (;;)
     {
-        Node *funNode = parseFunction(*tokens, source);
-        if (funNode == NULL)
-        {
-            continue;
-        }
-        if (funNode->type == N_EOF)
-        {
-            free(funNode);
-            break;
-        }
+        Token *token = nextToken(*tokens);
 
-        arrput(nodes, *funNode);
+        switch (token->type)
+        {
+        case T_EOF:
+            goto end_parser;
+        case T_MulFun:
+            Node *funNode = parseFunction(*tokens, source);
+            if (funNode == NULL)
+            {
+                tokenIndex--;
+                goto continue_parser;
+            }
+            if (funNode->type == N_EOF)
+            {
+                free(funNode);
+                goto end_parser;
+            }
+            arrput(nodes, *funNode);
+            goto continue_parser;
+
+        case T_DoIns:
+        case T_DontIns:
+            enum NodeType type = (token->type == T_DoIns) ? N_DoFunction : N_DontFunction;
+            Node *dontNode = parseStatement(*tokens, source, type);
+            if (dontNode == NULL)
+            {
+                tokenIndex--;
+                goto continue_parser;
+            }
+            if (dontNode->type == N_EOF)
+            {
+                free(dontNode);
+                goto end_parser;
+            }
+            arrput(nodes, *dontNode);
+            goto continue_parser;
+
+        default:
+            goto continue_parser;
+        }
+    continue_parser:
     }
-
+end_parser:
     return nodes;
 }
 
@@ -186,7 +241,7 @@ Token *lexer(char **source, bool extended)
             break;
         }
 
-        if (ch >= 'a' && ch <= 'z')
+        if ((ch >= 'a' && ch <= 'z') || ch == '\'')
         {
             token = (Token){
                 .type = T_MulFun,
@@ -194,7 +249,7 @@ Token *lexer(char **source, bool extended)
                 .length = 1,
             };
             ch = *(*source + index + 1);
-            while ((ch >= 'a' && ch <= 'z'))
+            while ((ch >= 'a' && ch <= 'z') || ch == '\'')
             {
                 index++;
                 token.length = index - token.start + 1;
@@ -207,7 +262,18 @@ Token *lexer(char **source, bool extended)
             char *tokenLastThreeCharsPtr = tokenCheck + token.length - 3;
             if (!(token.length >= 3 && strcmp(tokenLastThreeCharsPtr, "mul") == 0))
             {
-                token.type = T_Ins;
+                if (strcmp(tokenCheck + token.length - 2, "do") == 0 && extended)
+                {
+                    token.type = T_DoIns;
+                }
+                else if (strcmp(tokenCheck + token.length - 5, "don't") == 0 && extended)
+                {
+                    token.type = T_DontIns;
+                }
+                else
+                {
+                    token.type = T_Ins;
+                }
             }
 
             addToken(&tokens, token);
@@ -281,6 +347,7 @@ void addToken(Token **tokens, Token token)
 
 char *readSource(FILE *fPtr)
 {
+    tokenIndex = 0;
     fseek(fPtr, 0, SEEK_END);
     long size = ftell(fPtr);
     rewind(fPtr);

@@ -2,7 +2,7 @@
 
 extern FILE *load()
 {
-    return fopen("inputs/day_3_sample.txt", "r");
+    return fopen("inputs/day_3.txt", "r");
 }
 
 extern void part1(FILE *filePtr, char *result)
@@ -24,5 +24,17 @@ extern void part1(FILE *filePtr, char *result)
 
 extern void part2(FILE *filePtr, char *result)
 {
-    sprintf(result, "NOT IMPLEMENTED");
+    char *source = NULL;
+    Token *tokens = NULL;
+    int sum = 0;
+
+    source = readSource(filePtr);
+    tokens = lexer(&source, true);
+    Node *nodes = parser(&tokens, source);
+    sum = interpreter(nodes);
+    free(source);
+    arrfree(tokens);
+    arrfree(nodes);
+
+    sprintf(result, "%d", sum);
 }
