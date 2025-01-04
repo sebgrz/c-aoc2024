@@ -1,13 +1,32 @@
 #include "common.h"
+#include <stdbool.h>
+
+#define EXPECT_TOKEN(tokens, tokenType, tokenRef)                                                                      \
+    {                                                                                                                  \
+        int expected = expectToken(tokens, tokenType, tokenRef);                                                       \
+        if (expected < 0)                                                                                              \
+        {                                                                                                              \
+            Node *eofNode = malloc(sizeof(Node));                                                                      \
+            eofNode->type = N_EOF;                                                                                     \
+            return eofNode;                                                                                            \
+        }                                                                                                              \
+        if (expected == 0)                                                                                             \
+        {                                                                                                              \
+            return NULL;                                                                                               \
+        }                                                                                                              \
+    }
 
 enum TokenType
 {
-    None,
-    LeftParen,
-    RightParen,
-    Comma,
-    MulIns,
-    Number,
+    T_None,
+    T_LeftParen,
+    T_RightParen,
+    T_Comma,
+    T_MulIns,
+    T_Ins,
+    T_Number,
+    T_Char,
+    T_EOF,
 };
 
 typedef struct Token
@@ -16,10 +35,26 @@ typedef struct Token
     int start, length;
 } Token;
 
+enum NodeType
+{
+    N_MulFunction,
+    N_ArgNumber,
+    N_EOF,
+};
+
+typedef struct Node
+{
+    enum NodeType type;
+    struct Node *n1, *n2;
+    union {
+        int value;
+    };
+} Node;
+
 char *readSource(FILE *fPtr);
-int *parseMulToken(char **token);
 void addToken(Token **tokens, Token token);
 Token *lexer(char **source);
+Node *parser(Token **tokens, char *source);
 
 extern FILE *load()
 {
@@ -42,31 +77,101 @@ extern void part1(FILE *filePtr, char *result)
         printf("token { .type %d, .start %d, length %d } \n", t.type, t.start, t.length);
     }
 
+    Node *nodes = parser(&tokens, source);
+    printf("\nREAD NODES - %ld\n", arrlen(nodes));
+    for (int i = 0; i < arrlen(nodes); i++)
+    {
+        Node t = nodes[i];
+        printf("node { .type %d, .a1 %d, a2 %d } \n", t.type, t.n1->value, t.n2->value);
+    }
     free(source);
     arrfree(tokens);
 
     sprintf(result, "%d", sum);
 }
 
-void parser(Token **tokens, char *source)
+int tokenIndex = 0;
+Token *nextToken(Token *tokens)
 {
-    long size = arrlen(*tokens);
-    long index = 0;
-    for (; index < size;)
+    return (tokens + tokenIndex++);
+}
+
+int expectToken(Token *tokens, enum TokenType type, Token **tokenRef)
+{
+    Token *token = nextToken(tokens);
+    if (token->type == T_EOF)
     {
-        Token t = *(*tokens + index);
-        switch (t.type)
+        return -1;
+    }
+    if (token->type != type)
+    {
+        return 0;
+    }
+
+    *tokenRef = token;
+    return 1;
+}
+
+Node *argNode(int value)
+{
+    Node *node = malloc(sizeof(Node));
+    node->type = N_ArgNumber;
+    node->value = value;
+
+    return node;
+}
+
+Node *parseFunction(Token *tokens, char *source)
+{
+    Token *tokenRef = NULL;
+    EXPECT_TOKEN(tokens, T_MulIns, &tokenRef)
+    EXPECT_TOKEN(tokens, T_LeftParen, &tokenRef)
+
+    EXPECT_TOKEN(tokens, T_Number, &tokenRef)
+    char *number = malloc(tokenRef->length + 1);
+    *(number + tokenRef->length) = '\0';
+    strncpy(number, source + tokenRef->start, tokenRef->length);
+    int a = atoi(number);
+    free(number);
+
+    EXPECT_TOKEN(tokens, T_Comma, &tokenRef)
+
+    EXPECT_TOKEN(tokens, T_Number, &tokenRef)
+    number = malloc(tokenRef->length + 1);
+    *(number + tokenRef->length) = '\0';
+    strncpy(number, source + tokenRef->start, tokenRef->length);
+    int b = atoi(number);
+    free(number);
+
+    EXPECT_TOKEN(tokens, T_RightParen, &tokenRef)
+
+    Node *node = malloc(sizeof(Node));
+    node->type = N_MulFunction;
+    node->n1 = argNode(a);
+    node->n2 = argNode(b);
+    return node;
+}
+
+Node *parser(Token **tokens, char *source)
+{
+    Node *nodes = NULL;
+    for (;;)
+    {
+        Node *funNode = parseFunction(*tokens, source);
+        if (funNode == NULL)
         {
-        case LeftParen:
-        case RightParen:
-        case MulIns:
-        case Comma:
-        case Number:
-        default:
             continue;
         }
-        index++;
+        if (funNode->type == N_EOF)
+        {
+            free(funNode);
+            break;
+        }
+
+        arrput(nodes, *funNode);
     }
+
+    return nodes;
 }
 
 Token *lexer(char **source)
@@ -80,13 +185,19 @@ Token *lexer(char **source)
         ch = *(*source + index);
         if (ch == '\0')
         {
+            token = (Token){
+                .type = T_EOF,
+                .start = index,
+                .length = 0,
+            };
+            addToken(&tokens, token);
             break;
         }
 
         if (ch >= 'a' && ch <= 'z')
         {
             token = (Token){
-                .type = MulIns,
+                .type = T_MulIns,
                 .start = index,
                 .length = 1,
             };
@@ -102,16 +213,18 @@ Token *lexer(char **source)
             strncpy(tokenCheck, *source + token.start, token.length);
             *(tokenCheck + token.length) = '\0';
             char *tokenLastThreeCharsPtr = tokenCheck + token.length - 3;
-            if (token.length >= 3 && strcmp(tokenLastThreeCharsPtr, "mul") == 0)
+            if (!(token.length >= 3 && strcmp(tokenLastThreeCharsPtr, "mul") == 0))
             {
-                addToken(&tokens, token);
+                token.type = T_Ins;
             }
+
+            addToken(&tokens, token);
 
             free(tokenCheck);
         }
         else if (ch >= '0' && ch <= '9')
         {
-            token = (Token){.type = Number, .start = index, .length = 0};
+            token = (Token){.type = T_Number, .start = index, .length = 1};
             ch = *(*source + index + 1);
             while ((ch >= '0' && ch <= '9'))
             {
@@ -124,7 +237,7 @@ Token *lexer(char **source)
         else if (ch == '(')
         {
             token = (Token){
-                .type = LeftParen,
+                .type = T_LeftParen,
                 .start = index,
                 .length = 1,
             };
@@ -133,7 +246,7 @@ Token *lexer(char **source)
         else if (ch == ')')
         {
             token = (Token){
-                .type = RightParen,
+                .type = T_RightParen,
                 .start = index,
                 .length = 1,
             };
@@ -142,7 +255,7 @@ Token *lexer(char **source)
         else if (ch == ',')
         {
             token = (Token){
-                .type = Comma,
+                .type = T_Comma,
                 .start = index,
                 .length = 1,
             };
@@ -150,6 +263,12 @@ Token *lexer(char **source)
         }
         else
         {
+            token = (Token){
+                .type = T_Char,
+                .start = index,
+                .length = 1,
+            };
+            addToken(&tokens, token);
         }
 
         index++;
@@ -160,7 +279,7 @@ Token *lexer(char **source)
 
 void addToken(Token **tokens, Token token)
 {
-    if (token.type == None)
+    if (token.type == T_None)
     {
         return;
     }
