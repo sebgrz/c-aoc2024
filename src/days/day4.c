@@ -1,10 +1,12 @@
 #include "common.h"
+#include <stdbool.h>
 
 char *readWordSearch(FILE *fPtr, int *width, int *height);
+int searchPerLine(char *wordSearch, int line, int width, int height);
 
 extern FILE *load()
 {
-    return fopen("inputs/day_4_sample.txt", "r");
+    return fopen("inputs/day_4.txt", "r");
 }
 
 extern void part1(FILE *filePtr, char *result)
@@ -12,14 +14,9 @@ extern void part1(FILE *filePtr, char *result)
     int sum = 0, width, height;
     char *wordSearch = readWordSearch(filePtr, &width, &height);
 
-    printf("WORD SEARCH %d, %d\n", width, height);
     for (int y = 0; y < height; y++)
     {
-        for (int x = 0; x < width; x++)
-        {
-            printf("%c", wordSearch[y * width + x]);
-        }
-        printf("\n");
+        sum += searchPerLine(wordSearch, y, width, height);
     }
 
     arrfree(wordSearch);
@@ -31,6 +28,129 @@ extern void part2(FILE *filePtr, char *result)
     int sum = 0;
 
     sprintf(result, "%d", sum);
+}
+
+enum Direction
+{
+    D_UP,
+    D_UPRIGHT,
+    D_RIGHT,
+    D_DOWNRIGHT,
+    D_DOWN,
+    D_DOWNLEFT,
+    D_LEFT,
+    D_UPLEFT
+};
+
+bool searchDirection(char *wordSearch, int line, int pos, int width, int height, enum Direction direction)
+{
+    char word[4];
+    switch (direction)
+    {
+    case D_UP:
+        if (line < 3)
+        {
+            return false;
+        }
+        for (int i = 0; i < 4; i++)
+        {
+            word[i] = wordSearch[(line - i) * width + pos];
+        }
+        break;
+    case D_UPRIGHT:
+        if (line < 3 || width - pos < 4)
+        {
+            return false;
+        }
+        for (int i = 0; i < 4; i++)
+        {
+            word[i] = wordSearch[(line - i) * width + pos + i];
+        }
+        break;
+    case D_RIGHT:
+        if (width - pos < 4)
+        {
+            return false;
+        }
+        for (int i = 0; i < 4; i++)
+        {
+            word[i] = wordSearch[line * width + pos + i];
+        }
+        break;
+    case D_DOWNRIGHT:
+        if (height - line < 4 || width - pos < 4)
+        {
+            return false;
+        }
+        for (int i = 0; i < 4; i++)
+        {
+            word[i] = wordSearch[(line + i) * width + pos + i];
+        }
+        break;
+    case D_DOWN:
+        if (height - line < 4)
+        {
+            return false;
+        }
+        for (int i = 0; i < 4; i++)
+        {
+            word[i] = wordSearch[(line + i) * width + pos];
+        }
+        break;
+    case D_DOWNLEFT:
+        if (height - line < 4 || pos < 3)
+        {
+            return false;
+        }
+        for (int i = 0; i < 4; i++)
+        {
+            word[i] = wordSearch[(line + i) * width + pos - i];
+        }
+        break;
+    case D_LEFT:
+        if (pos < 3)
+        {
+            return false;
+        }
+        for (int i = 0; i < 4; i++)
+        {
+            word[i] = wordSearch[line * width + pos - i];
+        }
+        break;
+    case D_UPLEFT:
+        if (line < 3 || pos < 3)
+        {
+            return false;
+        }
+        for (int i = 0; i < 4; i++)
+        {
+            word[i] = wordSearch[(line - i) * width + pos - i];
+        }
+        break;
+    }
+
+    return strcmp(word, "XMAS") == 0;
+}
+
+int searchPerLine(char *wordSearch, int line, int width, int height)
+{
+    int found = 0;
+
+    for (int x = 0; x < width; x++)
+    {
+        if (wordSearch[line * width + x] == 'X')
+        {
+            for (int direction = D_UP; direction <= D_UPLEFT; direction++)
+            {
+                if (searchDirection(wordSearch, line, x, width, height, direction))
+                {
+                    found++;
+                }
+            }
+        }
+    }
+
+    return found;
 }
 
 char *readWordSearch(FILE *fPtr, int *width, int *height)
