@@ -2,7 +2,7 @@
 #include <stdbool.h>
 
 char *readWordSearch(FILE *fPtr, int *width, int *height);
-int searchPerLine(char *wordSearch, int line, int width, int height);
+int searchPerLine(char *wordSearch, int line, int width, int height, bool xShapeSearch);
 
 extern FILE *load()
 {
@@ -16,7 +16,7 @@ extern void part1(FILE *filePtr, char *result)
 
     for (int y = 0; y < height; y++)
     {
-        sum += searchPerLine(wordSearch, y, width, height);
+        sum += searchPerLine(wordSearch, y, width, height, false);
     }
 
     arrfree(wordSearch);
@@ -25,8 +25,16 @@ extern void part1(FILE *filePtr, char *result)
 
 extern void part2(FILE *filePtr, char *result)
 {
-    int sum = 0;
+    int sum = 0, width, height;
+    char *wordSearch = readWordSearch(filePtr, &width, &height);
 
+    // ignore first and last line - because we looking for A letter, the center of MAS word
+    for (int y = 1; y < height - 1; y++)
+    {
+        sum += searchPerLine(wordSearch, y, width, height, true);
+    }
+
+    arrfree(wordSearch);
     sprintf(result, "%d", sum);
 }
 
@@ -132,13 +140,27 @@ bool searchDirection(char *wordSearch, int line, int pos, int width, int height,
     return strcmp(word, "XMAS") == 0;
 }
 
-int searchPerLine(char *wordSearch, int line, int width, int height)
+bool hasDiagonalMasWord(char *wordSearch, int width, int line, int pos, bool checkLeft)
+{
+    if (checkLeft)
+    {
+        return (wordSearch[(line - 1) * width + pos - 1] == 'M' && wordSearch[(line + 1) * width + pos + 1] == 'S') ||
+               (wordSearch[(line - 1) * width + pos - 1] == 'S' && wordSearch[(line + 1) * width + pos + 1] == 'M');
+    }
+    else
+    {
+        return (wordSearch[(line - 1) * width + pos + 1] == 'M' && wordSearch[(line + 1) * width + pos - 1] == 'S') ||
+               (wordSearch[(line - 1) * width + pos + 1] == 'S' && wordSearch[(line + 1) * width + pos - 1] == 'M');
+    }
+}
+
+int searchPerLine(char *wordSearch, int line, int width, int height, bool xShapeSearch)
 {
     int found = 0;
 
     for (int x = 0; x < width; x++)
     {
-        if (wordSearch[line * width + x] == 'X')
+        if (wordSearch[line * width + x] == 'X' && !xShapeSearch)
         {
             for (int direction = D_UP; direction <= D_UPLEFT; direction++)
             {
@@ -146,6 +168,23 @@ int searchPerLine(char *wordSearch, int line, int width, int height)
                 {
                     found++;
                 }
+            }
+        }
+        else if (wordSearch[line * width + x] == 'A' && xShapeSearch)
+        {
+            // M S
+            //  A
+            // M S
+            // ignore first and last column
+            if (x == 0 || x == width - 1)
+            {
+                continue;
+            }
+
+            if (hasDiagonalMasWord(wordSearch, width, line, x, true) &&
+                hasDiagonalMasWord(wordSearch, width, line, x, false))
+            {
+                found++;
             }
         }
     }
